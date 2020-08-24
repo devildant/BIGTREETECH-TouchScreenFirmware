@@ -1,9 +1,9 @@
 #include "MachineSettings.h"
 
-u8 enabled_gcodes[CUSTOM_GCODES_COUNT];
-u8 gcode_num;
-u8 gc_page_count;
-u8 gc_cur_page = 0;
+uint8_t enabled_gcodes[CUSTOM_GCODES_COUNT];
+uint8_t gcode_num;
+uint8_t gc_page_count;
+uint8_t gc_cur_page = 0;
 
 CUSTOM_GCODES * customcodes = NULL;
 
@@ -67,9 +67,9 @@ void loaditemsCustomGcode()
 void menuCustom(void)
 {
   //load custom codes
-  customcodes = (CUSTOM_GCODES*)malloc(sizeof(CUSTOM_GCODES));
-  gc_cur_page = 0;
-  W25Qxx_ReadBuffer((u8*)customcodes,CUSTOM_GCODE_ADDR,sizeof(CUSTOM_GCODES));
+  CUSTOM_GCODES tempcodes;
+  customcodes = &tempcodes;
+  W25Qxx_ReadBuffer((u8*)&tempcodes,CUSTOM_GCODE_ADDR,sizeof(CUSTOM_GCODES));
   gcode_num = customcodes->count;
 
   gc_page_count = (gcode_num+LISTITEM_PER_PAGE-1)/LISTITEM_PER_PAGE;
@@ -88,7 +88,7 @@ void menuCustom(void)
       uint32_t item_index = gc_cur_page * LISTITEM_PER_PAGE + key_num;
       if (item_index < gcode_num)
       {
-        storeCmd(customcodes->gcode[item_index]);
+        mustStoreScript(customcodes->gcode[item_index]);
       }
     }
     switch(key_num)
@@ -116,6 +116,7 @@ void menuCustom(void)
       }
       break;
     case KEY_ICON_7:
+      gc_cur_page = 0;
       infoMenu.cur--;
       break;
     default:
@@ -123,10 +124,7 @@ void menuCustom(void)
     }
     loopProcess();
   }
-  free(customcodes);
 }
-
-
 
 void menuRGBSettings(void)
 {
@@ -134,7 +132,7 @@ void menuRGBSettings(void)
   // title
   LABEL_RGB_SETTINGS,
   // icon                       label
-  {{ICON_RGB_RED,              LABEL_RED},
+   {{ICON_RGB_RED,              LABEL_RED},
     {ICON_RGB_GREEN,            LABEL_GREEN},
     {ICON_RGB_BLUE,             LABEL_BLUE},
     {ICON_RGB_WHITE,            LABEL_WHITE},
@@ -184,23 +182,40 @@ void menuRGBSettings(void)
   }
 }
 
-
 void menuMachineSettings(void)
 {
-
+  // 1 title, ITEM_PER_PAGE items (icon + label)
   MENUITEMS machineSettingsItems = {
-  // title
-  LABEL_MACHINE_SETTINGS,
-  // icon                       label
-  {{ICON_CUSTOM,               LABEL_CUSTOM},
-    {ICON_RGB_SETTINGS,         LABEL_RGB_SETTINGS},
-    {ICON_GCODE,                LABEL_TERMINAL},
-    {ICON_SHUT_DOWN,            LABEL_SHUT_DOWN},
-    {ICON_PARAMETER,            LABEL_PARAMETER_SETTING},
-    {ICON_BACKGROUND,           LABEL_BACKGROUND},
-    {ICON_BACKGROUND,           LABEL_BACKGROUND},
-    {ICON_BACK,                 LABEL_BACK},}
+    // title
+    LABEL_MACHINE_SETTINGS,
+    // icon                         label
+    {{ICON_PARAMETER,               LABEL_PARAMETER_SETTING},
+     {ICON_CUSTOM,                  LABEL_CUSTOM},
+     {ICON_RGB_SETTINGS,            LABEL_RGB_SETTINGS},
+     {ICON_TUNING,                  LABEL_TUNING},
+      #if QUICK_EEPROM_BUTTON == 1
+        {ICON_EEPROM_SAVE,             LABEL_SAVE},
+        {ICON_EEPROM_RESTORE,          LABEL_RESTORE},
+        {ICON_EEPROM_RESET,            LABEL_RESET},
+      #else
+        {ICON_BACKGROUND,           LABEL_BACKGROUND},
+        {ICON_BACKGROUND,           LABEL_BACKGROUND},
+        {ICON_BACKGROUND,           LABEL_BACKGROUND},
+      #endif
+     {ICON_BACK,                    LABEL_BACK}}
   };
+
+#if QUICK_EEPROM_BUTTON == 1
+  if (infoMachineSettings.EEPROM != 1)
+  {
+    for (int i = 0; i < 3;i++)
+    {
+    machineSettingsItems.items[KEY_ICON_4 + i].icon = ICON_BACKGROUND;
+    machineSettingsItems.items[KEY_ICON_4 + i].label.index = LABEL_BACKGROUND;
+    }
+  }
+#endif
+
   KEY_VALUES key_num = KEY_IDLE;
 
   menuDrawPage(&machineSettingsItems);
@@ -210,28 +225,44 @@ void menuMachineSettings(void)
     key_num = menuKeyGetValue();
     switch(key_num)
     {
-
       case KEY_ICON_0:
-        infoMenu.menu[++infoMenu.cur] =  menuCustom;
-        break;
-
-      case KEY_ICON_1:
-        infoMenu.menu[++infoMenu.cur] = menuRGBSettings;
-        break;
-
-      case KEY_ICON_2:
-        infoMenu.menu[++infoMenu.cur] = menuSendGcode;
-        break;
-
-      case KEY_ICON_3:
-        storeCmd("M81\n");
-        break;
-
-      case KEY_ICON_4:
-        mustStoreCmd("M503 S0\n");
         infoMenu.menu[++infoMenu.cur] = menuParameterSettings;
         break;
 
+      case KEY_ICON_1:
+        infoMenu.menu[++infoMenu.cur] = menuCustom;
+        break;
+
+      case KEY_ICON_2:
+        infoMenu.menu[++infoMenu.cur] = menuRGBSettings;
+        break;
+
+      case KEY_ICON_3:
+        infoMenu.menu[++infoMenu.cur] = menuTuning;
+        break;
+
+    #if QUICK_EEPROM_BUTTON == 1
+      case KEY_ICON_4:
+        // save to EEPROM
+        if (infoMachineSettings.EEPROM == 1)
+          showDialog(DIALOG_TYPE_QUESTION, textSelect(machineSettingsItems.title.index), textSelect(LABEL_EEPROM_SAVE_INFO),
+                     textSelect(LABEL_CONFIRM), textSelect(LABEL_CANCEL), saveEepromSettings, NULL, NULL);
+        break;
+
+      case KEY_ICON_5:
+        // restore from EEPROM
+        if (infoMachineSettings.EEPROM == 1)
+          showDialog(DIALOG_TYPE_QUESTION, textSelect(machineSettingsItems.title.index), textSelect(LABEL_EEPROM_RESTORE_INFO),
+                   textSelect(LABEL_CONFIRM), textSelect(LABEL_CANCEL), restoreEepromSettings, NULL, NULL);
+        break;
+
+      case KEY_ICON_6:
+        // reset EEPROM
+        if (infoMachineSettings.EEPROM == 1)
+          showDialog(DIALOG_TYPE_QUESTION, textSelect(machineSettingsItems.title.index), textSelect(LABEL_EEPROM_RESET_INFO),
+                   textSelect(LABEL_CONFIRM), textSelect(LABEL_CANCEL), resetEepromSettings, NULL, NULL);
+        break;
+    #endif
       case KEY_ICON_7:
         infoMenu.cur--;
         break;
@@ -239,7 +270,6 @@ void menuMachineSettings(void)
       default:
         break;
     }
-
     loopProcess();
   }
 }

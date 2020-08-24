@@ -86,7 +86,7 @@ bool FIL_SmartRunoutDetect(void)
   {  /* Send M114 E query extrude position continuously	*/
     if(update_waiting == true)        {nextTime=OS_GetTimeMs()+update_time;break;}
     if(OS_GetTimeMs()<nextTime)       break;
-    if(RequestCommandInfoIsRunning()) break; //to avoid colision in Gcode response processing
+    if(requestCommandInfoIsRunning()) break; //to avoid colision in Gcode response processing
     if(storeCmd("M114 E\n")==false)   break;
 
     nextTime=OS_GetTimeMs()+update_time;
@@ -148,7 +148,7 @@ void loopFrontEndFILRunoutDetect(void)
   if (setPrintPause(true,false))
   {
     setPrintRunout(false);
-    popupReminder(textSelect(LABEL_WARNING), textSelect(LABEL_FILAMENT_RUNOUT));
+    popupReminder(DIALOG_TYPE_ERROR, textSelect(LABEL_WARNING), textSelect(LABEL_FILAMENT_RUNOUT));
   }
 }
 #endif

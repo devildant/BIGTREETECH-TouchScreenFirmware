@@ -42,6 +42,10 @@ const GUI_RECT rect_of_keyListView[ITEM_PER_PAGE]={
   {2*START_X + LISTITEM_WIDTH,  2*LIST_ICON_HEIGHT+2*LISTICON_SPACE_Y+ICON_START_Y,  2*START_X + LISTITEM_WIDTH + 1*LIST_ICON_WIDTH,  3*LIST_ICON_HEIGHT+2*LISTICON_SPACE_Y+ICON_START_Y},
 };
 
+//area for toast notification
+const GUI_RECT toastRect = {START_X + TITLE_END_Y - (TOAST_Y_PAD * 2), TOAST_Y_PAD, LCD_WIDTH - START_X, TITLE_END_Y - TOAST_Y_PAD};
+const GUI_RECT toastIconRect = {START_X, TOAST_Y_PAD, START_X + TITLE_END_Y - (TOAST_Y_PAD * 2), TITLE_END_Y - TOAST_Y_PAD};
+
 //Clean up the gaps outside icons
 void menuClearGaps(void)
 {
@@ -66,13 +70,145 @@ void GUI_RestoreColorDefault(void){
   GUI_SetColor(infoSettings.font_color);
   GUI_SetTextMode(GUI_TEXTMODE_NORMAL);
   GUI_SetNumMode(GUI_NUMMODE_SPACE);
+  setLargeFont(false);
 }
 
 static const MENUITEMS *curMenuItems = NULL;   //current menu
 
 static const LISTITEMS *curListItems = NULL;   //current listmenu
 
-static bool isListview;
+static MENU_TYPE menuType = MENU_TYPE_ICON;
+
+//toast notification variables
+static TOAST toastlist[TOAST_MSG_COUNT];
+
+//char toastMsg[TOAST_MSG_COUNT][TOAST_MSG_LENGTH];
+//bool toastNew[TOAST_MSG_COUNT]; //store status on messages (new or old)
+static uint8_t nextToastIndex = 0;   //next index to store new message
+static uint8_t curToastDisplay = 0;  // current toast notification being displayed
+static uint32_t nextToastTime = 0;   //time to change to next notification
+
+bool _toastRunning = false;
+
+//Add new message to toast notification queue
+void addToast(DIALOG_TYPE style, char * text)
+{
+  #ifdef LCD_LED_PWM_CHANNEL
+    if (infoSettings.lcd_idle_timer != LCD_DIM_OFF)
+    {
+      //The LCD dim function is activated. First check if it's dimmed
+      if (lcd_dim.dimmed)
+      {
+        lcd_dim.dimmed = false;
+        Set_LCD_Brightness(LCD_BRIGHTNESS[infoSettings.lcd_brightness]);
+      }
+      //Set a new idle_ms time
+      lcd_dim.idle_ms = OS_GetTimeMs();
+    }
+  
+  #endif
+
+  TOAST t;
+  strncpy(t.text, text, TOAST_MSG_LENGTH);
+  t.text[TOAST_MSG_LENGTH - 1] = 0; //ensure string ends with null terminator
+  t.isNew = true;
+  toastlist[nextToastIndex] = t;
+  nextToastIndex = (nextToastIndex + 1) % TOAST_MSG_COUNT;
+}
+
+//check if notification is currently displayed
+bool toastRunning(void)
+{
+  return _toastRunning;
+}
+
+//check if any new notification is available
+bool toastAvailable(void)
+{
+  for (int i = 0; i < TOAST_MSG_COUNT; i++)
+  {
+      if(toastlist[i].isNew == true)
+       return true;
+  }
+  return false;
+}
+
+//show next notification
+void drawToast(bool redraw)
+{
+  if(!redraw)
+    curToastDisplay = (curToastDisplay + 1) % TOAST_MSG_COUNT;
+
+  if(toastlist[curToastDisplay].isNew == true || redraw)
+  {
+    //Set toast notification running status
+    _toastRunning = true;
+
+    // Draw icon
+    uint8_t *icon;
+    uint8_t cursound;
+    if (toastlist[curToastDisplay].style == DIALOG_TYPE_ERROR)
+    {
+      GUI_SetColor(MAT_RED);
+      icon = IconCharSelect(ICONCHAR_ERROR);
+      cursound = sound_error;
+    }
+    else if (toastlist[curToastDisplay].style == DIALOG_TYPE_SUCCESS)
+    {
+      GUI_SetColor(MAT_GREEN);
+      icon = IconCharSelect(ICONCHAR_OK_ROUND);
+      cursound = sound_success;
+    }
+    else
+    {
+      GUI_SetColor(MAT_BLUE);
+      icon = IconCharSelect(ICONCHAR_INFO);
+      cursound = sound_toast;
+    }
+
+    if (!redraw)
+      BUZZER_PLAY(cursound);
+
+    GUI_SetTextMode(GUI_TEXTMODE_TRANS);
+    GUI_FillPrect(&toastIconRect);
+    GUI_SetColor(WHITE);
+    GUI_DispStringInPrect(&toastIconRect, icon);
+
+    //draw text
+    GUI_SetColor(MAT_LOWWHITE);
+    GUI_FillPrect(&toastRect);
+    GUI_SetColor(DARKGRAY);
+    GUI_DispStringInPrect(&toastRect, (u8 *)toastlist[curToastDisplay].text);
+
+    //set current toast notification as old/completed
+    toastlist[curToastDisplay].isNew = false;
+
+    //set new timer if notification is new
+    if(!redraw)
+      nextToastTime = OS_GetTimeMs() + TOAST_DURATION;
+
+    GUI_RestoreColorDefault();
+  }
+}
+
+//check and control toast notification display
+void loopToast(void)
+{
+  if (OS_GetTimeMs() > nextToastTime)
+  {
+    if (toastAvailable())
+    {
+      drawToast(false);
+    }
+    else if(_toastRunning == true)
+    {
+    _toastRunning = false;
+    GUI_ClearPrect(&toastIconRect);
+    GUI_ClearPrect(&toastRect);
+      menuReDrawCurTitle();
+    }
+  }
+}
 
 uint8_t *labelGetAddress(const LABEL *label)
 {
@@ -133,6 +269,16 @@ void menuRefreshListPage(void){
 
 }
 
+void setMenuType(MENU_TYPE type)
+{
+  menuType = type;
+}
+
+MENU_TYPE getMenuType(void)
+{
+  return menuType;
+}
+
 static REMINDER reminder = {{0, 0, LCD_WIDTH, TITLE_END_Y}, 0, STATUS_UNCONNECT, LABEL_UNCONNECTED};
 static REMINDER volumeReminder = {{0, 0, LCD_WIDTH, TITLE_END_Y}, 0, STATUS_IDLE, LABEL_BACKGROUND};
 static REMINDER busySign = {{LCD_WIDTH - 5, 0, LCD_WIDTH, 5}, 0, STATUS_BUSY, LABEL_BUSY};
@@ -145,6 +291,8 @@ void reminderSetUnConnected(void)
 
 void reminderMessage(int16_t inf, SYS_STATUS status)
 {
+  if(_toastRunning)
+    return;
   reminder.inf = inf;
   GUI_SetColor(infoSettings.reminder_color);
   GUI_SetBkColor(infoSettings.title_bg_color);
@@ -156,6 +304,22 @@ void reminderMessage(int16_t inf, SYS_STATUS status)
 
 void volumeReminderMessage(int16_t inf, SYS_STATUS status)
 {
+  #ifdef LCD_LED_PWM_CHANNEL
+    if (infoSettings.lcd_idle_timer != LCD_DIM_OFF)
+    {
+      //The LCD dim function is activated. First check if it's dimmed
+      if (lcd_dim.dimmed)
+      {
+        lcd_dim.dimmed = false;
+        Set_LCD_Brightness(LCD_BRIGHTNESS[infoSettings.lcd_brightness]);
+      }
+      //Set a new idle_ms time
+      lcd_dim.idle_ms = OS_GetTimeMs();
+    }
+  #endif
+
+  if(_toastRunning)
+    return;
   volumeReminder.inf = inf;
   GUI_SetColor(infoSettings.sd_reminder_color);
   GUI_SetBkColor(infoSettings.title_bg_color);
@@ -204,18 +368,7 @@ void loopReminderClear(void)
 
   /* Clear warning message */
   reminder.status = STATUS_IDLE;
-  if (isListview)
-  {
-    if (curListItems == NULL)
-    return;
-    menuDrawTitle(labelGetAddress(&curListItems->title));
-  }
-  else
-  {
-    if (curMenuItems == NULL)
-      return;
-    menuDrawTitle(labelGetAddress(&curMenuItems->title));
-  }
+  menuReDrawCurTitle();
 }
 
 void loopVolumeReminderClear(void)
@@ -232,19 +385,7 @@ void loopVolumeReminderClear(void)
 
   /* Clear warning message */
   volumeReminder.status = STATUS_IDLE;
-  if(isListview)
-  {
-    if(curListItems == NULL)
-      return;
-    menuDrawTitle(labelGetAddress(&curListItems->title));
-  }
-  else
-  {
-  if(curMenuItems == NULL)
-    return;
-  menuDrawTitle(labelGetAddress(&curMenuItems->title));
-  }
-
+  menuReDrawCurTitle();
 }
 
 void loopBusySignClear(void)
@@ -269,17 +410,24 @@ void loopBusySignClear(void)
 
 void menuDrawTitle(const uint8_t *content) //(const MENUITEMS * menuItems)
 {
+  if (_toastRunning)
+  {
+    drawToast(true);
+    return;
+  }
   uint16_t start_y = (TITLE_END_Y - BYTE_HEIGHT) / 2;
-  GUI_FillRectColor(10, start_y, LCD_WIDTH-10, start_y+BYTE_HEIGHT, infoSettings.title_bg_color);
-
+  uint16_t start_x = 10;
+  uint16_t end_x = drawTemperatureStatus();
+  GUI_SetBkColor(infoSettings.title_bg_color);
   if (content)
   {
-    GUI_SetTextMode(GUI_TEXTMODE_TRANS);
-    GUI_DispLenString(10, start_y, content, LCD_WIDTH-20);
-    GUI_SetTextMode(GUI_TEXTMODE_NORMAL);
+    GUI_DispLenString(10, start_y, content, LCD_WIDTH - 20);
+    start_x += GUI_StrPixelWidth(content);
+    if (start_x > LCD_WIDTH-20) start_x = LCD_WIDTH - 20;
   }
+  GUI_ClearRect(start_x, start_y, end_x, start_y+BYTE_HEIGHT);
 
-  show_GlobalInfo();
+  GUI_SetBkColor(infoSettings.bg_color);
   if(reminder.status == STATUS_IDLE) return;
   GUI_SetColor(infoSettings.reminder_color);
   GUI_SetBkColor(infoSettings.title_bg_color);
@@ -287,11 +435,25 @@ void menuDrawTitle(const uint8_t *content) //(const MENUITEMS * menuItems)
   GUI_RestoreColorDefault();
 }
 
+void menuReDrawCurTitle(void)
+{
+  if (menuType == MENU_TYPE_LISTVIEW)
+  {
+    if(curListItems == NULL) return;
+    menuDrawTitle(labelGetAddress(&curListItems->title));
+  }
+  else if(menuType == MENU_TYPE_ICON)
+  {
+    if(curMenuItems == NULL) return;
+    menuDrawTitle(labelGetAddress(&curMenuItems->title));
+  }
+}
+
 //Draw the entire interface
 void menuDrawPage(const MENUITEMS *menuItems)
 {
   u8 i = 0;
-  isListview = false;
+  menuType = MENU_TYPE_ICON;
   curMenuItems = menuItems;
   TSC_ReDrawIcon = itemDrawIconPress;
 
@@ -314,7 +476,7 @@ void menuDrawPage(const MENUITEMS *menuItems)
 void menuDrawListPage(const LISTITEMS *listItems)
 {
   u8 i = 0;
-  isListview = true;
+  menuType = MENU_TYPE_LISTVIEW;
   curListItems = listItems;
   TSC_ReDrawIcon = itemDrawIconPress;
 
@@ -338,8 +500,59 @@ void menuDrawListPage(const LISTITEMS *listItems)
         }
     #endif
   }
-//  show_globalinfo();
 }
+
+//Show live info text on icons
+void showLiveInfo(uint8_t index, const LIVE_INFO * liveicon, const ITEM * item)
+{
+  if (item != NULL)
+    menuDrawIconOnly(item,index);
+
+  for (uint8_t i = 0; i < LIVEICON_LINES; i++)
+  {
+    if (liveicon->enabled[i] == true)
+    {
+      GUI_SetColor(lcd_colors[liveicon->lines[i].fn_color]);
+      if (liveicon->lines[i].text_mode != GUI_TEXTMODE_TRANS)
+        GUI_SetBkColor(lcd_colors[liveicon->lines[i].bk_color]);
+      GUI_SetTextMode(liveicon->lines[i].text_mode);
+
+      GUI_POINT loc;
+      loc.x = liveicon->lines[i].pos.x + rect_of_key[index].x0;
+
+      if (liveicon->lines[i].v_align == BOTTOM)
+      {
+        loc.y = liveicon->lines[i].pos.y + rect_of_key[index].y0 - BYTE_HEIGHT;
+      }
+      else if (liveicon->lines[i].v_align == CENTER)
+      {
+        loc.y = liveicon->lines[i].pos.y + rect_of_key[index].y0 - BYTE_HEIGHT / 2;
+      }
+      else
+      {
+        loc.y = liveicon->lines[i].pos.y + rect_of_key[index].y0;
+      }
+      switch (liveicon->lines[i].h_align)
+      {
+      case LEFT:
+        GUI_DispString(loc.x, loc.y, liveicon->lines[i].text);
+        break;
+
+      case CENTER:
+        GUI_DispStringCenter(loc.x, loc.y, liveicon->lines[i].text);
+        break;
+
+      case RIGHT:
+        GUI_DispStringRight(loc.x, loc.y, liveicon->lines[i].text);
+        break;
+
+      default:
+        break;
+      }
+    }
+  }
+  GUI_RestoreColorDefault();
+} //showLiveInfo
 
 //When there is a button value, the icon changes color and redraws
 void itemDrawIconPress(u8 position, u8 is_press)
@@ -347,7 +560,7 @@ void itemDrawIconPress(u8 position, u8 is_press)
 
   if (position > KEY_ICON_7) return;
 
-  if (isListview == false)
+  if (menuType == MENU_TYPE_ICON)
   {
     if (curMenuItems == NULL) return;
     if (curMenuItems->items[position].icon == ICON_BACKGROUND) return;
@@ -359,7 +572,7 @@ void itemDrawIconPress(u8 position, u8 is_press)
     else // Redraw normal icon when released
       ICON_ReadDisplay(rect->x0, rect->y0, curMenuItems->items[position].icon);
   }
-  else
+  else if (menuType == MENU_TYPE_LISTVIEW)
   { //draw rec over list item if pressed
     if (curListItems == NULL)
     return;
@@ -384,14 +597,15 @@ void itemDrawIconPress(u8 position, u8 is_press)
 // Get button value
 KEY_VALUES menuKeyGetValue(void)
 {
-  if (isListview == false)
+  if (menuType == MENU_TYPE_ICON)
   {
-    return (KEY_VALUES)KEY_GetValue(sizeof(rect_of_key) / sizeof(rect_of_key[0]), rect_of_key); // for normal menu
+    return (KEY_VALUES)KEY_GetValue(COUNT(rect_of_key), rect_of_key); // for normal menu
   }
-  else
+  else if (menuType == MENU_TYPE_LISTVIEW)
   {
-    return (KEY_VALUES)KEY_GetValue(sizeof(rect_of_keyListView) / sizeof(rect_of_keyListView[0]), rect_of_keyListView); //for listview
+    return (KEY_VALUES)KEY_GetValue(COUNT(rect_of_keyListView), rect_of_keyListView); //for listview
   }
+  else return KEY_IDLE;
 }
 
 //Get the top left point of the corresponding icon position)
@@ -410,13 +624,17 @@ void loopBackEnd(void)
 
   parseRcvGcode();                    //Parse the received Gcode from other UART, such as: ESP3D, etc...
 
-  loopCheckHeater();                  //Temperature related settings
+  loopCheckHeater();                  //Temperature monitor
+
+  loopFan();                          //Fan speed monitor
+
+  loopSpeed();                        //Speed & flow monitor
 
 #ifdef BUZZER_PIN
   loopBuzzer();
 #endif
 
-if(infoMachineSettings.onboard_sd_support == ENABLED && infoMachineSettings.autoReportSDStatus == DISABLED)
+  if(infoMachineSettings.onboard_sd_support == ENABLED && infoMachineSettings.autoReportSDStatus == DISABLED)
   {
     loopCheckPrinting(); //Check if there is a SD or USB print running.
   }
@@ -426,19 +644,24 @@ if(infoMachineSettings.onboard_sd_support == ENABLED && infoMachineSettings.auto
 #endif
 
 #if LCD_ENCODER_SUPPORT
-  loopCheckEncoder();
-  if(infoMenu.menu[infoMenu.cur] != menuST7920)
+  #if defined(ST7920_SPI) || defined(LCD2004_simulator)
+    if(infoMenu.menu[infoMenu.cur] != menuMarlinMode)
+  #endif
     {
       loopCheckEncoderSteps(); //check change in encoder steps
     }
 #endif
 
-#ifdef ST7920_SPI
+#if defined(ST7920_SPI) || defined(LCD2004_simulator)
   loopCheckMode();
 #endif
 
 #ifdef FIL_RUNOUT_PIN
   loopBackEndFILRunoutDetect();
+#endif
+
+#ifdef LCD_LED_PWM_CHANNEL
+  loopDimTimer();
 #endif
 }
 
@@ -446,14 +669,16 @@ void loopFrontEnd(void)
 {
   loopVolumeSource();                 //Check if volume source(SD/U disk) insert
 
+  loopToast();
+
   loopReminderClear();                //If there is a message in the status bar, timed clear
 
   loopVolumeReminderClear();
 
   loopBusySignClear();                //Busy Indicator clear
 
-  temp_Change();  
-  
+  loopTemperatureStatus();
+
 #ifdef FIL_RUNOUT_PIN
   loopFrontEndFILRunoutDetect();
 #endif
