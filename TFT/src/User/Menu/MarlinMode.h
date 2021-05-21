@@ -1,7 +1,10 @@
 #ifndef _MARLIN_MODE_H_
 #define _MARLIN_MODE_H_
 
-#include "stdint.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "Configuration.h"
 
 // User-defined colors for Marlin mode from Configuration.h
@@ -14,5 +17,9 @@
 #endif
 
 void menuMarlinMode(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
