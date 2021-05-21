@@ -58,7 +58,7 @@
  *          SPANISH,    FRENCH,   PORTUGUESE,  ITALIAN,    POLISH,    SLOVAK,        DUTCH,
  *          HUNGARIAN,  TURKISH,  GREEK,       SLOVENIAN,  CATALAN,   TRAD_CHINESE,  UKRAINIAN
  */
-#define DEFAULT_LANGUAGE ENGLISH  // Default: ENGLISH
+#define DEFAULT_LANGUAGE FRENCH  // Default: ENGLISH
 
 /**
  * Default Touch Mode Color Options
@@ -67,11 +67,11 @@
  *           6: MAGENTA,    7: YELLOW,      8: ORANGE,   9: PURPLE,   10: LIME,  11: BROWN,
  *          12: DARKBLUE,  13: DARKGREEN,  14: GRAY,    15: DARKGRAY
  */
-#define TITLE_BACKGROUND_COLOR      1  // Title background color (Default: 1)
+#define TITLE_BACKGROUND_COLOR      2  // Title background color (Default: 1)
 #define BACKGROUND_COLOR            1  // Background color (Default: 1)
-#define FONT_COLOR                  0  // Font foreground color (Default: 0)
-#define REMINDER_FONT_COLOR         2  // Reminder font color, such as: "No print attached", "Busy processing", etc. (Default: 2)
-#define VOLUME_REMINDER_FONT_COLOR  5  // Volume reminder font color, such as: "Card inserted", "Card removed" (Default: 5)
+#define FONT_COLOR                  2  // Font foreground color (Default: 0)
+#define REMINDER_FONT_COLOR        14  // Reminder font color, such as: "No print attached", "Busy processing", etc. (Default: 2)
+#define VOLUME_REMINDER_FONT_COLOR 14  // Volume reminder font color, such as: "Card inserted", "Card removed" (Default: 5)
 #define STATUS_XYZ_BG_COLOR        15  // Background color for X Y Z position display in Status Screen. (Default: 15)
 #define LISTVIEW_BORDER_COLOR      15  // Border color in List view (Default: 15)
 #define LISTVIEW_ICON_COLOR        15  // icon color in List view (Default: 15)
@@ -92,7 +92,7 @@
  * Options: MODE_MARLIN (Marlin Mode)
  *          MODE_SERIAL_TSC (Touch Mode)
  */
-#define DEFAULT_LCD_MODE MODE_SERIAL_TSC  // Default: MODE_SERIAL_TSC
+#define DEFAULT_LCD_MODE MODE_MARLIN  // Default: MODE_SERIAL_TSC
 
 /**
  * Default Marlin Mode Background & Font Color Options
@@ -103,10 +103,10 @@
  *          12: DARKBLUE,  13: DARKGREEN,  14: GRAY,    15: DARKGRAY
  */
 #define MARLIN_BKCOLOR 1  // Default: 1
-#define MARLIN_FNCOLOR 0  // Default: 0
+#define MARLIN_FNCOLOR 2  // Default: 0
 
 // Text displayed at the top of the TFT in Marlin Mode
-#define MARLIN_BANNER_TEXT "Marlin Mode"  // Default: "Marlin Mode"
+#define MARLIN_BANNER_TEXT "CR-10S Ultimate"  // Default: "Marlin Mode"
 
 // Show banner text at the top of the TFT in Marlin Mode
 #define MARLIN_SHOW_BANNER true  // To enabled: true | To disabled: false (Default: true)
@@ -149,10 +149,10 @@
                            // cooling if marlin supports ontroller fan (M710).
 
 #define PREHEAT_LABELS {"PLA", "PETG", "ABS", "WOOD", "TPU", "NYLON"}
-#define PREHEAT_HOTEND {200,   240,    230,   170,    220,   250}
+#define PREHEAT_HOTEND {200,   240,    250,   170,    220,   250}
 #define PREHEAT_BED    { 60,    70,     90,    50,     50,    90}
 
-#define HEAT_MAX_TEMP   {275,       275,       275,       275,       275,       275,       150,    60}
+#define HEAT_MAX_TEMP   {290,       275,       275,       275,       275,       275,       110,    60}
 #define HEAT_SIGN_ID    {"T0:",     "T1:",     "T2:",     "T3:",     "T4:",     "T5:",     "B:",   "C:"}
 #define HEAT_DISPLAY_ID {"T0",      "T1",      "T2",      "T3",      "T4",      "T5",      "Bed",  "Chamber"}
 #define HEAT_CMD        {"M104 T0", "M104 T1", "M104 T2", "M104 T3", "M104 T4", "M104 T5", "M140", "M141"}
@@ -200,9 +200,9 @@
 #define X_MIN_POS   0
 #define Y_MIN_POS   0
 #define Z_MIN_POS   0
-#define X_MAX_POS 235
-#define Y_MAX_POS 235
-#define Z_MAX_POS 250
+#define X_MAX_POS 300
+#define Y_MAX_POS 300
+#define Z_MAX_POS 400
 
 /**
  * Raised Z height for probing
@@ -375,7 +375,7 @@
  *          3: LED_ORANGE,  4: LED_YELLOW,  5: LED_GREEN,
  *          6: LED_BLUE,    7: LED_INDIGO,  8: LED_VIOLET
 */
-#define STARTUP_KNOB_LED_COLOR 1  // Default: 1
+#define STARTUP_KNOB_LED_COLOR 2  // Default: 1
 
 // Keep the LED state in Marlin Mode
 #define KEEP_KNOB_LED_COLOR_MARLIN_MODE
@@ -389,7 +389,7 @@
  *          9: 80 Percent,  10: 90 Percent,  11: 100 Percent
  */
 #define DEFAULT_LCD_BRIGHTNESS       11  // Default: 11
-#define DEFAULT_LCD_IDLE_BRIGHTNESS   3  // Default: 3
+#define DEFAULT_LCD_IDLE_BRIGHTNESS   0  // Default: 3
 
 /**
  * Idle LCD diming Timer (TFT28 V3.0, TFT35 E3.0, TFT43 V3.0, TFT50 V3.0 & TFT70 V3.0)
@@ -400,7 +400,7 @@
  *          3: 30 Seconds,   4: 60 Seconds,     5: 120 Seconds,
  *          6: 300 Seconds,  7: CUSTOM Seconds
  */
-#define DEFAULT_LCD_IDLE_TIMER  0  // Default: 0
+#define DEFAULT_LCD_IDLE_TIMER  5  // Default: 0
 #define LCD_DIM_CUSTOM_SECONDS (10 * 60)  // Custom value in seconds. This will be used if DEFAULT_LCD_IDLE_TIMER
                                           // is set to 7 (CUSTOM Seconds).
 
