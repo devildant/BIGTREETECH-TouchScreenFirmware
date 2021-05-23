@@ -62,12 +62,13 @@ void menuMarlinMode(void)
 
     #if LCD_ENCODER_SUPPORT
       sendEncoder(LCD_ReadTouch());
-
-      if (LCD_BtnTouch(LCD_BUTTON_INTERVALS))
-        sendEncoder(1);
+      
+      //disable zone touch area on marlin mode
+      // if (LCD_BtnTouch(LCD_BUTTON_INTERVALS))
+      //   sendEncoder(1);
     #endif
-
-    loopCheckMode();
+    // disable swith menu 
+    // loopCheckMode();
 
     #if defined(SCREEN_SHOT_TO_SD)
       loopScreenShot();
