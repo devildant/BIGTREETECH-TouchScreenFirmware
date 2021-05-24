@@ -60,13 +60,13 @@ void menuMarlinMode(void)
       marlinParse(data);
     }
 
-    #if LCD_ENCODER_SUPPORT
-      sendEncoder(LCD_ReadTouch());
+    //disable zone touch area on marlin mode
+    // #if LCD_ENCODER_SUPPORT
+    //   sendEncoder(LCD_ReadTouch());
       
-      //disable zone touch area on marlin mode
-      // if (LCD_BtnTouch(LCD_BUTTON_INTERVALS))
-      //   sendEncoder(1);
-    #endif
+    //   if (LCD_BtnTouch(LCD_BUTTON_INTERVALS))
+    //     sendEncoder(1);
+    // #endif
     // disable swith menu 
     // loopCheckMode();
 
